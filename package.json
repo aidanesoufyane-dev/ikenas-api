@@ -1,0 +1,40 @@
+{
+  "name": "ikenas-gestion-backend",
+  "version": "1.0.0",
+  "description": "Backend API pour la gestion d'établissement scolaire Ikenas",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node seeds/seed.js",
+    "reset:admin": "node seeds/seed.js --admin-only",
+    "reset:core": "node seeds/seed.js --core-data",
+    "seed:subjects:fr": "node seeds/seed.js --subjects-fr",
+    "seed:demo": "node seeds/seed-demo.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "firebase-admin": "^12.0.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.3.2",
+    "express-validator": "^7.2.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.6.0",
+    "morgan": "^1.10.0",
+    "multer": "^2.1.0",
+    "pdfkit": "^0.18.0",
+    "socket.io": "^4.7.5",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "xlsx": "^0.18.5",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

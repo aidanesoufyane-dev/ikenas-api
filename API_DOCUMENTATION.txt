@@ -1,0 +1,910 @@
+================================================================================
+  IKENAS GESTION API — COMPLETE API DOCUMENTATION
+  Version: 2.0  |  Base URL: http://localhost:5000/api
+================================================================================
+
+AUTHENTICATION
+--------------
+All protected endpoints require a Bearer token in the Authorization header:
+  Authorization: Bearer <JWT_TOKEN>
+
+Roles: admin | teacher | student (parent accounts use the "student" role)
+
+Rate limiting: 30 requests / 15 min on login & register endpoints.
+
+================================================================================
+1. AUTH  —  /api/auth
+================================================================================
+
+POST   /api/auth/register
+  Access : Public
+  Body   : { firstName, lastName, email, password, role }
+  Returns: { success, token, user }
+
+POST   /api/auth/login
+  Access : Public
+  Body   : { email, password }
+  Returns: { success, token, user }
+  Notes  : Returns 401 if account is inactive (isActive: false)
+
+GET    /api/auth/me
+  Access : Private (any role)
+  Returns: { success, data: <user object> }
+
+PUT    /api/auth/update-profile
+  Access : Private (any role)
+  Body   : { firstName?, lastName?, phone?, avatar? }
+  Returns: { success, data: <updated user> }
+
+================================================================================
+2. MESSAGES (Chat)  —  /api/messages
+================================================================================
+
+GET    /api/messages
+  Access : Private (any role)
+  Query  : ?type=direct|class&page=1&limit=20
+  Returns: { success, data: [messages], total, page }
+  Notes  : Students/parents see messages addressed to them or their class.
+           Teachers see messages they sent or received for their classes.
+
+POST   /api/messages
+  Access : Private (teacher, admin)
+  Body   : { content, recipientType: "individual"|"class"|"broadcast",
+             targetUser?, targetClass?, allowReply? }
+  Multipart: attachments[] (files)
+  Returns: { success, data: <message> }
+
+GET    /api/messages/:id
+  Access : Private (any role)
+  Returns: { success, data: <message with sender populated> }
+
+PUT    /api/messages/:id
+  Access : Private (sender only)
+  Body   : { content }
+  Returns: { success, data: <updated message> }
+
+DELETE /api/messages/:id
+  Access : Private (sender or admin)
+  Returns: { success, data: {} }
+
+POST   /api/messages/:id/reply
+  Access : Private (student — only if allowReply=true on parent message)
+  Body   : { content }
+  Returns: { success, data: <reply message> }
+  Notes  : Returns 403 if allowReply is false on the target message.
+
+GET    /api/messages/threads
+  Access : Private (any role)
+  Returns: { success, data: [thread summaries with last message & unread count] }
+
+================================================================================
+3. ASSIGNMENTS (Homework)  —  /api/assignments
+================================================================================
+
+GET    /api/assignments
+  Access : Private (any role)
+  Query  : ?subject=&classe=&page=1&limit=20
+  Returns: { success, data: [assignments] }
+  Notes  : Students see only assignments for their class.
+           Each item includes isSubmitted / submittedAt for the requesting student.
+
+POST   /api/assignments
+  Access : Private (teacher, admin)
+  Body   : { title, description, subject, classe, dueDate, attachments? }
+  Returns: { success, data: <assignment> }
+
+GET    /api/assignments/:id
+  Access : Private (any role)
+  Returns: { success, data: <assignment> }
+
+PUT    /api/assignments/:id
+  Access : Private (teacher owner, admin)
+  Body   : { title?, description?, dueDate? }
+  Returns: { success, data: <updated assignment> }
+
+DELETE /api/assignments/:id
+  Access : Private (teacher owner, admin)
+  Returns: { success, data: {} }
+
+POST   /api/assignments/:id/submit
+  Access : Private (student)
+  Body   : {} (or { note? })
+  Returns: { success, data: <submission> }
+
+GET    /api/assignments/:id/submissions
+  Access : Private (teacher, admin)
+  Returns: { success, data: [submissions with student info] }
+
+================================================================================
+4. NOTIFICATIONS  —  /api/notifications
+================================================================================
+
+GET    /api/notifications
+  Access : Private (any role)
+  Query  : ?unread=true&limit=30
+  Returns: { success, data: [notifications], unreadCount }
+  Notes  : Aggregates broadcast + role-based + class-based + personal notifications.
+
+GET    /api/notifications/unread-count
+  Access : Private (any role)
+  Returns: { success, unreadCount }
+
+PUT    /api/notifications/read
+  Access : Private (any role)
+  Body   : { ids: ["<id>", ...] }  — omit ids to mark ALL as read
+  Returns: { success, message }
+
+DELETE /api/notifications/:id
+  Access : Private (admin deletes; others hide for themselves)
+  Returns: { success, data: {} }
+
+DELETE /api/notifications
+  Access : Private (any role)
+  Notes  : Hides all notifications for the requesting user.
+  Returns: { success, data: {} }
+
+================================================================================
+5. PAYMENTS  —  /api/payments
+================================================================================
+
+--- Admin / Cashier ---
+
+GET    /api/payments
+  Access : Private (admin, cashier)
+  Query  : ?search=&status=pending|paid|overdue&page=1&limit=20
+  Returns: { success, data: [payments], total, page }
+
+POST   /api/payments
+  Access : Private (admin, cashier)
+  Body   : { student, amount, type, dueDate, description? }
+  Returns: { success, data: <payment> }
+
+PUT    /api/payments/:id
+  Access : Private (admin, cashier)
+  Body   : { amount?, dueDate?, status?, description? }
+  Returns: { success, data: <updated payment> }
+
+DELETE /api/payments/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+POST   /api/payments/:id/mark-paid
+  Access : Private (admin, cashier)
+  Body   : { paidAt?, note? }
+  Returns: { success, data: <updated payment> }
+
+GET    /api/payments/stats
+  Access : Private (admin, cashier)
+  Returns: { success, data: { totalCollected, totalPending, overdueCount, ... } }
+
+GET    /api/payments/export
+  Access : Private (admin)
+  Returns: CSV file download
+
+--- Student / Parent ---
+
+GET    /api/payments/my
+  Access : Private (student)
+  Returns: { success, data: [my payments] }
+
+GET    /api/payments/:id/download-receipt
+  Access : Private (student — own payments only; admin — any)
+  Returns: PDF receipt file
+  Notes  : Students cannot download receipts for other students (403).
+
+POST   /api/payments/fcm-token
+  Access : Private (any role)
+  Body   : { token }
+  Returns: { success }
+  Notes  : Registers device FCM token for push notifications.
+
+================================================================================
+6. ATTENDANCE  —  /api/attendances
+================================================================================
+
+GET    /api/attendances
+  Access : Private (admin, teacher)
+  Query  : ?classe=&date=YYYY-MM-DD&subject=
+  Returns: { success, data: [attendance records] }
+
+POST   /api/attendances
+  Access : Private (teacher, admin)
+  Body   : { classe, subject, date, records: [{ student, status: present|absent|late }] }
+  Returns: { success, data: <attendance session> }
+
+PUT    /api/attendances/:id
+  Access : Private (teacher owner, admin)
+  Body   : { records? }
+  Returns: { success, data: <updated attendance> }
+
+DELETE /api/attendances/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/attendances/student/:studentId
+  Access : Private (admin, teacher, student — self only)
+  Query  : ?from=YYYY-MM-DD&to=YYYY-MM-DD
+  Returns: { success, data: [attendance records], stats: { present, absent, late, rate } }
+
+GET    /api/attendances/class/:classeId/stats
+  Access : Private (admin, teacher)
+  Returns: { success, data: { byStudent: [...], overall: {...} } }
+
+GET    /api/attendances/my
+  Access : Private (student)
+  Returns: { success, data: [attendance records], stats }
+
+POST   /api/attendances/bulk
+  Access : Private (teacher, admin)
+  Body   : { sessions: [{ classe, subject, date, records }] }
+  Returns: { success, data: [created sessions] }
+
+GET    /api/attendances/export
+  Access : Private (admin)
+  Query  : ?classe=&from=&to=
+  Returns: CSV file
+
+GET    /api/attendances/report
+  Access : Private (admin, teacher)
+  Returns: { success, data: attendance report object }
+
+================================================================================
+7. NOTES / GRADES  —  /api/notes
+================================================================================
+
+GET    /api/notes
+  Access : Private (admin, teacher)
+  Query  : ?classe=&subject=&trimestre=1|2|3&page=1
+  Returns: { success, data: [grade records] }
+
+POST   /api/notes
+  Access : Private (teacher, admin)
+  Body   : { student, subject, classe, trimestre, note, type, date? }
+  Returns: { success, data: <grade> }
+
+GET    /api/notes/:id
+  Access : Private (admin, teacher)
+  Returns: { success, data: <grade> }
+
+PUT    /api/notes/:id
+  Access : Private (teacher owner, admin)
+  Body   : { note?, type? }
+  Returns: { success, data: <updated grade> }
+
+DELETE /api/notes/:id
+  Access : Private (admin, teacher owner)
+  Returns: { success, data: {} }
+
+GET    /api/notes/student/:studentId
+  Access : Private (admin, teacher, student — self only)
+  Query  : ?trimestre=&subject=
+  Returns: { success, data: [grades], average }
+
+GET    /api/notes/class/:classeId/summary
+  Access : Private (admin, teacher)
+  Query  : ?trimestre=
+  Returns: { success, data: { byStudent: [...], classAverage } }
+
+GET    /api/notes/my
+  Access : Private (student)
+  Returns: { success, data: [grades], average }
+
+POST   /api/notes/bulk
+  Access : Private (teacher, admin)
+  Body   : { notes: [{ student, note, ... }] }
+  Returns: { success, data: [created grades] }
+
+GET    /api/notes/export
+  Access : Private (admin, teacher)
+  Returns: CSV file
+
+GET    /api/notes/report-card/:studentId
+  Access : Private (admin, teacher, student — self only)
+  Returns: { success, data: <report card object> }
+
+================================================================================
+8. EXAMS  —  /api/exams
+================================================================================
+
+GET    /api/exams
+  Access : Private (any role)
+  Query  : ?classe=&trimestre=&page=1
+  Returns: { success, data: [exams] }
+  Notes  : Students only see exams for their class.
+
+POST   /api/exams
+  Access : Private (admin, teacher)
+  Body   : { title, subject, classe, date, duration, trimestre, coefficient? }
+  Returns: { success, data: <exam> }
+
+GET    /api/exams/:id
+  Access : Private (any role)
+  Returns: { success, data: <exam> }
+
+PUT    /api/exams/:id
+  Access : Private (admin, teacher owner)
+  Body   : { title?, date?, duration? }
+  Returns: { success, data: <updated exam> }
+
+DELETE /api/exams/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+POST   /api/exams/:id/results
+  Access : Private (teacher, admin)
+  Body   : { results: [{ student, score }] }
+  Returns: { success, data: <updated exam with results> }
+
+GET    /api/exams/:id/results
+  Access : Private (admin, teacher)
+  Returns: { success, data: [results with student info] }
+
+GET    /api/exams/my
+  Access : Private (student)
+  Returns: { success, data: [exams with my result attached] }
+
+GET    /api/exams/upcoming
+  Access : Private (any role)
+  Returns: { success, data: [upcoming exams sorted by date] }
+
+================================================================================
+9. STUDENTS  —  /api/students
+================================================================================
+
+GET    /api/students
+  Access : Private (admin, teacher)
+  Query  : ?search=&classe=&page=1&limit=20
+  Returns: { success, data: [students], total, page }
+
+POST   /api/students
+  Access : Private (admin)
+  Body   : { firstName, lastName, email, password, classe, dateOfBirth?, photo? }
+  Returns: { success, data: <student> }
+
+GET    /api/students/:id
+  Access : Private (admin, teacher)
+  Returns: { success, data: <student with classe populated> }
+
+PUT    /api/students/:id
+  Access : Private (admin)
+  Body   : { firstName?, lastName?, classe?, phone?, address? }
+  Returns: { success, data: <updated student> }
+
+DELETE /api/students/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/students/me
+  Access : Private (student)
+  Returns: { success, data: <own student profile> }
+
+GET    /api/students/:id/full-report
+  Access : Private (admin, teacher)
+  Returns: { success, data: { student, grades, attendance, assignments, behavior } }
+
+================================================================================
+10. TEACHERS  —  /api/teachers
+================================================================================
+
+GET    /api/teachers
+  Access : Private (admin)
+  Query  : ?search=&subject=&page=1
+  Returns: { success, data: [teachers], total }
+
+POST   /api/teachers
+  Access : Private (admin)
+  Body   : { firstName, lastName, email, password, subjects: [], classes: [] }
+  Returns: { success, data: <teacher> }
+
+GET    /api/teachers/:id
+  Access : Private (admin)
+  Returns: { success, data: <teacher with classes & subjects> }
+
+PUT    /api/teachers/:id
+  Access : Private (admin)
+  Body   : { firstName?, lastName?, subjects?, classes?, phone? }
+  Returns: { success, data: <updated teacher> }
+
+DELETE /api/teachers/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/teachers/me
+  Access : Private (teacher)
+  Returns: { success, data: <own teacher profile> }
+
+GET    /api/teachers/:id/schedule
+  Access : Private (admin, teacher — self)
+  Returns: { success, data: [schedule entries] }
+
+GET    /api/teachers/:id/classes
+  Access : Private (admin, teacher — self)
+  Returns: { success, data: [classes with student counts] }
+
+GET    /api/teachers/:id/stats
+  Access : Private (admin, teacher — self)
+  Returns: { success, data: { totalStudents, avgGrade, attendanceRate, ... } }
+
+GET    /api/teachers/:id/students
+  Access : Private (admin, teacher — self)
+  Returns: { success, data: [students across all teacher's classes] }
+
+GET    /api/teachers/:id/assignments
+  Access : Private (admin, teacher — self)
+  Returns: { success, data: [assignments created by teacher] }
+
+POST   /api/teachers/:id/assign-class
+  Access : Private (admin)
+  Body   : { classeId }
+  Returns: { success, data: <updated teacher> }
+
+DELETE /api/teachers/:id/remove-class/:classeId
+  Access : Private (admin)
+  Returns: { success, data: <updated teacher> }
+
+GET    /api/teachers/export
+  Access : Private (admin)
+  Returns: CSV file
+
+================================================================================
+11. CLASSES  —  /api/classes
+================================================================================
+
+GET    /api/classes
+  Access : Private (admin, teacher)
+  Query  : ?section=&page=1
+  Returns: { success, data: [classes] }
+
+POST   /api/classes
+  Access : Private (admin)
+  Body   : { name, section, level?, capacity? }
+  Returns: { success, data: <class> }
+
+GET    /api/classes/:id
+  Access : Private (admin, teacher)
+  Returns: { success, data: <class with section populated> }
+
+PUT    /api/classes/:id
+  Access : Private (admin)
+  Body   : { name?, section?, capacity? }
+  Returns: { success, data: <updated class> }
+
+DELETE /api/classes/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/classes/:id/students
+  Access : Private (admin, teacher)
+  Returns: { success, data: [students in class] }
+
+GET    /api/classes/:id/stats
+  Access : Private (admin, teacher)
+  Returns: { success, data: { studentCount, avgGrade, attendanceRate } }
+
+================================================================================
+12. SECTIONS  —  /api/sections
+================================================================================
+
+GET    /api/sections
+  Access : Private (admin)
+  Returns: { success, data: [sections] }
+
+POST   /api/sections
+  Access : Private (admin)
+  Body   : { name, description? }
+  Returns: { success, data: <section> }
+
+GET    /api/sections/:id
+  Access : Private (admin)
+  Returns: { success, data: <section> }
+
+PUT    /api/sections/:id
+  Access : Private (admin)
+  Body   : { name?, description? }
+  Returns: { success, data: <updated section> }
+
+DELETE /api/sections/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+================================================================================
+13. SUBJECTS  —  /api/subjects
+================================================================================
+
+GET    /api/subjects
+  Access : Private (admin, teacher)
+  Returns: { success, data: [subjects] }
+
+POST   /api/subjects
+  Access : Private (admin)
+  Body   : { name, code?, coefficient? }
+  Returns: { success, data: <subject> }
+
+GET    /api/subjects/:id
+  Access : Private (admin, teacher)
+  Returns: { success, data: <subject> }
+
+PUT    /api/subjects/:id
+  Access : Private (admin)
+  Body   : { name?, coefficient? }
+  Returns: { success, data: <updated subject> }
+
+DELETE /api/subjects/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+================================================================================
+14. STAFF  —  /api/staff
+================================================================================
+
+GET    /api/staff
+  Access : Private (admin)
+  Query  : ?role=&search=&page=1
+  Returns: { success, data: [staff members], total }
+
+POST   /api/staff
+  Access : Private (admin)
+  Body   : { firstName, lastName, email, password, role, phone? }
+  Returns: { success, data: <staff member> }
+
+PUT    /api/staff/:id
+  Access : Private (admin)
+  Body   : { firstName?, lastName?, role?, phone?, isActive? }
+  Returns: { success, data: <updated staff member> }
+
+DELETE /api/staff/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+================================================================================
+15. DASHBOARD  —  /api/dashboard
+================================================================================
+
+GET    /api/dashboard
+  Access : Private (admin)
+  Returns: {
+    success,
+    data: {
+      totalStudents,
+      totalTeachers,
+      totalClasses,
+      recentPayments,
+      attendanceToday,
+      upcomingExams,
+      recentMessages,
+      unpaidCount
+    }
+  }
+
+================================================================================
+16. EVENTS  —  /api/events
+================================================================================
+
+GET    /api/events
+  Access : Private (any role)
+  Query  : ?from=YYYY-MM-DD&to=YYYY-MM-DD
+  Returns: { success, data: [events] }
+
+POST   /api/events
+  Access : Private (admin)
+  Body   : { title, description, date, endDate?, type?, targetRole? }
+  Returns: { success, data: <event> }
+
+GET    /api/events/:id
+  Access : Private (any role)
+  Returns: { success, data: <event> }
+
+PUT    /api/events/:id
+  Access : Private (admin)
+  Body   : { title?, description?, date?, endDate? }
+  Returns: { success, data: <updated event> }
+
+DELETE /api/events/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/events/upcoming
+  Access : Private (any role)
+  Query  : ?limit=5
+  Returns: { success, data: [upcoming events] }
+
+================================================================================
+17. NEWS  —  /api/news
+================================================================================
+
+GET    /api/news
+  Access : Private (any role)
+  Query  : ?page=1&limit=10
+  Returns: { success, data: [news items], total }
+
+POST   /api/news
+  Access : Private (admin)
+  Body   : { title, content, image?, category? }
+  Returns: { success, data: <news item> }
+
+GET    /api/news/:id
+  Access : Private (any role)
+  Returns: { success, data: <news item> }
+
+PUT    /api/news/:id
+  Access : Private (admin)
+  Body   : { title?, content?, image? }
+  Returns: { success, data: <updated news item> }
+
+DELETE /api/news/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/news/latest
+  Access : Private (any role)
+  Query  : ?limit=3
+  Returns: { success, data: [latest news] }
+
+================================================================================
+18. BEHAVIOR  —  /api/behavior
+================================================================================
+
+GET    /api/behavior
+  Access : Private (admin, teacher)
+  Query  : ?student=&classe=&from=&to=
+  Returns: { success, data: [behavior records] }
+
+POST   /api/behavior
+  Access : Private (admin, teacher)
+  Body   : { student, type: positive|negative|neutral, description, date?, severity? }
+  Returns: { success, data: <behavior record> }
+
+GET    /api/behavior/student/:studentId
+  Access : Private (admin, teacher, student — self only)
+  Returns: { success, data: [records], summary: { positive, negative, neutral } }
+
+================================================================================
+19. TRANSPORT  —  /api/transports
+================================================================================
+
+--- Bus Management (Admin) ---
+
+GET    /api/transports/buses
+  Access : Private (admin)
+  Returns: { success, data: [buses] }
+
+POST   /api/transports/buses
+  Access : Private (admin)
+  Body   : { busNumber, capacity, driverName, driverPhone, route? }
+  Returns: { success, data: <bus> }
+
+GET    /api/transports/buses/:id
+  Access : Private (admin)
+  Returns: { success, data: <bus> }
+
+PUT    /api/transports/buses/:id
+  Access : Private (admin)
+  Body   : { busNumber?, capacity?, driverName?, driverPhone? }
+  Returns: { success, data: <updated bus> }
+
+DELETE /api/transports/buses/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+--- Route Management (Admin) ---
+
+GET    /api/transports/routes
+  Access : Private (admin)
+  Returns: { success, data: [routes] }
+
+POST   /api/transports/routes
+  Access : Private (admin)
+  Body   : { name, stops: [{ name, time }], bus? }
+  Returns: { success, data: <route> }
+
+GET    /api/transports/routes/:id
+  Access : Private (admin)
+  Returns: { success, data: <route> }
+
+PUT    /api/transports/routes/:id
+  Access : Private (admin)
+  Body   : { name?, stops? }
+  Returns: { success, data: <updated route> }
+
+DELETE /api/transports/routes/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+--- Student Assignment ---
+
+POST   /api/transports/assign
+  Access : Private (admin)
+  Body   : { student, bus, route }
+  Returns: { success, data: <assignment> }
+
+GET    /api/transports/my-bus
+  Access : Private (student)
+  Returns: { success, data: { bus, route, stop } }
+
+--- GPS Tracking ---
+
+POST   /api/transports/location
+  Access : Private (admin — GPS device posts here)
+  Body   : { busId, lat, lng, timestamp? }
+  Returns: { success }
+  Notes  : Requires real GPS hardware integration.
+
+GET    /api/transports/location/:busId
+  Access : Private (admin, student with assigned bus)
+  Returns: { success, data: { lat, lng, updatedAt } }
+
+GET    /api/transports/location/:busId/history
+  Access : Private (admin)
+  Query  : ?from=&to=
+  Returns: { success, data: [location history] }
+
+================================================================================
+20. SCHEDULES  —  /api/schedules
+================================================================================
+
+GET    /api/schedules
+  Access : Private (any role)
+  Query  : ?classe=&teacher=
+  Returns: { success, data: [schedule entries] }
+  Notes  : Students automatically filtered to their class.
+           Teachers automatically filtered to their classes.
+
+POST   /api/schedules
+  Access : Private (admin)
+  Body   : { classe, teacher, subject, day: 0-6, startTime: "HH:MM",
+             endTime: "HH:MM", room? }
+  Returns: { success, data: <schedule entry> }
+
+GET    /api/schedules/:id
+  Access : Private (any role)
+  Returns: { success, data: <schedule entry> }
+
+PUT    /api/schedules/:id
+  Access : Private (admin)
+  Body   : { day?, startTime?, endTime?, room?, teacher?, subject? }
+  Returns: { success, data: <updated entry> }
+
+DELETE /api/schedules/:id
+  Access : Private (admin)
+  Returns: { success, data: {} }
+
+GET    /api/schedules/my
+  Access : Private (student, teacher)
+  Returns: { success, data: [schedule entries for the week] }
+
+GET    /api/schedules/class/:classeId
+  Access : Private (admin, teacher)
+  Returns: { success, data: [full class schedule] }
+
+GET    /api/schedules/conflicts
+  Access : Private (admin)
+  Query  : ?teacher=&room=
+  Returns: { success, data: [conflicting entries] }
+
+================================================================================
+21. LEAVE REQUESTS  —  /api/leave-requests
+================================================================================
+
+GET    /api/leave-requests
+  Access : Private (admin)
+  Query  : ?status=pending|approved|rejected&page=1
+  Returns: { success, data: [leave requests], total }
+
+POST   /api/leave-requests
+  Access : Private (teacher, student)
+  Body   : { type, fromDate, toDate, reason, attachments? }
+  Returns: { success, data: <leave request> }
+
+PUT    /api/leave-requests/:id
+  Access : Private (admin)
+  Body   : { status: approved|rejected, adminNote? }
+  Returns: { success, data: <updated leave request> }
+
+GET    /api/leave-requests/my
+  Access : Private (teacher, student)
+  Returns: { success, data: [own leave requests] }
+
+================================================================================
+22. SETTINGS  —  /api/settings
+================================================================================
+
+GET    /api/settings
+  Access : Private (admin)
+  Returns: { success, data: <settings object> }
+
+PUT    /api/settings
+  Access : Private (admin)
+  Body   : { schoolName?, academicYear?, gradingScale?, timezone?,
+             notificationsEnabled?, maintenanceMode? }
+  Returns: { success, data: <updated settings> }
+
+GET    /api/settings/public
+  Access : Public
+  Returns: { success, data: { schoolName, academicYear, logo } }
+
+================================================================================
+23. HEALTH CHECK
+================================================================================
+
+GET    /api/health
+  Access : Public
+  Returns: { success: true, message: "Ikenas Gestion API is running" }
+
+================================================================================
+SOCKET.IO — REAL-TIME EVENTS
+================================================================================
+
+Connection:
+  const socket = io('http://localhost:5000', { auth: { token: '<JWT>' } });
+
+Events emitted by server:
+  new-message       — { message }       New message arrived for the user
+  message-edited    — { messageId, content }
+  message-deleted   — { messageId }
+  notification      — { notification }  New push notification
+  attendance-update — { classe, date }  Attendance recorded/updated
+
+Events emitted by client:
+  join-room   — { roomId }   Join a class or direct-message room
+  leave-room  — { roomId }
+
+Notes:
+  - Connection is refused if JWT is invalid or expired.
+  - Each user is automatically placed in a personal room (their userId).
+  - Class messages are broadcast to the class room (classeId).
+
+================================================================================
+ERROR RESPONSES
+================================================================================
+
+All errors follow the format:
+  { "success": false, "message": "<description>" }
+
+  400 Bad Request      — Missing or invalid request body
+  401 Unauthorized     — Missing token, invalid token, or wrong credentials
+  403 Forbidden        — Authenticated but insufficient role/ownership
+  404 Not Found        — Resource does not exist
+  409 Conflict         — Duplicate entry (e.g., email already exists)
+  422 Unprocessable    — Validation failed
+  429 Too Many Requests — Rate limit exceeded (auth endpoints: 30/15min)
+  500 Internal Error   — Unexpected server error (check server logs)
+
+================================================================================
+FILE UPLOADS
+================================================================================
+
+Upload endpoint: multipart/form-data with field name "attachments"
+Served at      : GET /uploads/messages/<filename>
+Max file size  : 10 MB per file
+Allowed types  : jpeg, jpg, png, gif, pdf, doc, docx, xls, xlsx, mp4, mp3
+
+Cross-Origin header on uploads: Cross-Origin-Resource-Policy: cross-origin
+(Required for Flutter/mobile apps to display files inline)
+
+================================================================================
+PAGINATION
+================================================================================
+
+Endpoints that support pagination accept:
+  ?page=<number>&limit=<number>   (default: page=1, limit=20)
+
+Response includes:
+  { data: [...], total: <int>, page: <int>, pages: <int> }
+
+================================================================================
+ENVIRONMENT VARIABLES REQUIRED
+================================================================================
+
+  PORT              Server port (default: 5000)
+  NODE_ENV          development | production
+  MONGO_URI         MongoDB connection string
+  JWT_SECRET        Min 48-char random string (required in production)
+  JWT_EXPIRE        Token lifetime (default: 7d)
+  CLIENT_URL        Frontend URL for CORS
+  FIREBASE_PROJECT_ID     Firebase project ID (push notifications)
+  FIREBASE_CLIENT_EMAIL   Firebase service account email
+  FIREBASE_PRIVATE_KEY    Firebase private key (PEM format)
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
