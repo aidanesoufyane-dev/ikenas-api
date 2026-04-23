@@ -40,24 +40,18 @@ const isOriginAllowed = (origin) => {
     return true;
   }
 
+  // Always allow local development origins (any localhost port).
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return true;
+  }
+
   const configuredOrigins = getConfiguredOrigins();
   if (configuredOrigins.length > 0) {
     return configuredOrigins.includes(origin);
   }
 
-  // Fallback local dev/réseau si aucune origine de prod n'est configurée.
-  const localPatterns = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    /^http:\/\/(192\.168|10\.0|172\.1[6-9]|172\.2[0-9]|172\.3[0-1])\.\d{1,3}\.\d{1,3}:5173$/,
-  ];
-
-  return localPatterns.some((pattern) => {
-    if (typeof pattern === 'string') {
-      return pattern === origin;
-    }
-    return pattern.test(origin);
-  });
+  // Fallback local network (e.g. physical device on same Wi-Fi).
+  return /^http:\/\/(192\.168|10\.0|172\.1[6-9]|172\.2[0-9]|172\.3[0-1])\.\d{1,3}\.\d{1,3}:\d+$/.test(origin);
 };
 
 const corsOptions = {
