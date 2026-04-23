@@ -148,9 +148,35 @@ const updatePassword = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Enregistrer / mettre à jour le token FCM du device
+ * @route   POST /api/auth/fcm-token
+ * @access  Private
+ */
+const updateFcmToken = asyncHandler(async (req, res) => {
+  const { fcmToken } = req.body;
+
+  if (!fcmToken) {
+    return res.status(400).json({ success: false, message: 'fcmToken requis.' });
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user.fcmTokens) user.fcmTokens = [];
+
+  if (!user.fcmTokens.includes(fcmToken)) {
+    // Keep max 5 tokens per user (multiple devices)
+    if (user.fcmTokens.length >= 5) user.fcmTokens.shift();
+    user.fcmTokens.push(fcmToken);
+    await user.save();
+  }
+
+  res.status(200).json({ success: true, message: 'Token FCM enregistré.' });
+});
+
 module.exports = {
   login,
   register,
   getMe,
   updatePassword,
+  updateFcmToken,
 };
