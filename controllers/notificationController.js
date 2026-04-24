@@ -49,7 +49,7 @@ const getMyNotifications = asyncHandler(async (req, res) => {
     orConditions.push({ recipientClass: { $in: teacherClassIds } });
   }
 
-  const filter = { $or: orConditions };
+  const filter = { $or: orConditions, hiddenBy: { $ne: userId } };
 
   if (unreadOnly) {
     filter.readBy = { $ne: userId };
@@ -61,7 +61,7 @@ const getMyNotifications = asyncHandler(async (req, res) => {
     .limit(limit);
 
   // Compter les non lues
-  const unreadFilter = { $or: orConditions, readBy: { $ne: userId } };
+  const unreadFilter = { $or: orConditions, hiddenBy: { $ne: userId }, readBy: { $ne: userId } };
   const unreadCount = await Notification.countDocuments(unreadFilter);
 
   res.status(200).json({

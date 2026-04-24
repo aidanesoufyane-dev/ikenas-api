@@ -27,9 +27,11 @@ const notificationSchema = new mongoose.Schema(
         'event_created',
         'event_updated',
         'absence_recorded',
-        'absence_pending',     // for admin
+        'absence_pending',
         'absence_approved',
         'absence_rejected',
+        'attendance_pending_validation',
+        'attendance_justification_submitted',
         'assignment_created',
         'exam_scheduled',
         'grade_added',
@@ -40,10 +42,17 @@ const notificationSchema = new mongoose.Schema(
         'transport_vignette_due',
         'transport_assurance_due',
         'payment_due_reminder',
+        'payment_late_reminder',
         'payment_confirmed',
         'general',
       ],
     },
+    hiddenBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     title: {
       type: String,
       required: true,
