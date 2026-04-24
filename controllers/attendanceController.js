@@ -644,7 +644,6 @@ const getMyAttendances = asyncHandler(async (req, res) => {
 
   const filter = {
     student: student._id,
-    approvalStatus: 'approved',
   };
 
   if (req.query.from || req.query.to) {

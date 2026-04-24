@@ -99,8 +99,11 @@ const sendNotification = async (io, opts) => {
       } else if (opts.recipientClass) {
         const Student = require('../models/Student');
         const students = await Student.find({ classe: opts.recipientClass })
-          .populate('user', 'fcmTokens');
-        tokens = students.flatMap(s => s.user?.fcmTokens || []);
+          .populate('user', 'fcmTokens')
+          .populate({ path: 'parent', populate: { path: 'user', select: 'fcmTokens' } });
+        const studentTokens = students.flatMap(s => s.user?.fcmTokens || []);
+        const parentTokens = students.flatMap(s => s.parent?.user?.fcmTokens || []);
+        tokens = [...studentTokens, ...parentTokens];
       } else {
         // broadcast — all active users
         const users = await User.find({ isActive: true }).select('fcmTokens');

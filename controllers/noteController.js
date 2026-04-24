@@ -391,6 +391,7 @@ const notifyGradeAdded = async ({ io, teacher, sheetTitle, classeId, subjectId, 
     const message = `${teacherName} a ajouté ${noteCount} note(s) pour ${sheetTitle} de la classe ${classe?.name || 'N/A'} et matière ${subject?.name || 'N/A'}.`;
     const link = role === 'supervisor' ? '/supervisor/notes' : '/admin/notes';
 
+    // Notify admin / supervisor
     await sendNotification(io, {
       type: 'grade_added',
       title,
@@ -399,6 +400,18 @@ const notifyGradeAdded = async ({ io, teacher, sheetTitle, classeId, subjectId, 
       recipientRole: role,
       createdBy: teacher ? teacher.user?._id : null,
     });
+
+    // Also notify students in the class so the Notes tab populates for them
+    if (classeId) {
+      await sendNotification(io, {
+        type: 'grade_added',
+        title,
+        message: `${teacherName} a publié des notes pour ${subject?.name || sheetTitle}.`,
+        link: '/student/notes',
+        recipientClass: classeId,
+        createdBy: teacher ? teacher.user?._id : null,
+      });
+    }
   } catch (err) {
     console.error('Erreur notification note ajoutée :', err.message);
   }
