@@ -611,16 +611,35 @@ const getTeachersBasic = asyncHandler(async (req, res) => {
  * @access  Private/Teacher
  */
 const getMyClasses = asyncHandler(async (req, res) => {
-  const teacher = await Teacher.findOne({ user: req.user.id }).populate('classes', 'name level');
+  const teacher = await Teacher.findOne({ user: req.user.id }).populate({
+    path: 'classes',
+    select: 'name level',
+    populate: { path: 'studentCount' },
+  });
 
   if (!teacher) {
     res.status(404);
     throw new Error('Profil enseignant introuvable.');
   }
 
+  // Attach studentCount virtual to each class
+  const classes = await Promise.all(
+    (teacher.classes || []).map(async (cls) => {
+      const Student = require('../models/Student');
+      const count = await Student.countDocuments({ classe: cls._id });
+      return {
+        _id: cls._id,
+        id: cls._id,
+        name: cls.name,
+        level: cls.level,
+        studentCount: count,
+      };
+    })
+  );
+
   res.status(200).json({
     success: true,
-    data: teacher.classes || [],
+    data: classes,
   });
 });
 
