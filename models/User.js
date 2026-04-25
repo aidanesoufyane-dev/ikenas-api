@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    avatarIndex: {
+      type: Number,
+      default: null,
+    },
     fcmTokens: [{ type: String }],
   isActive: {
       type: Boolean,

@@ -168,6 +168,7 @@ const messageAttachmentFilter = (req, file, cb) => {
     'audio/mp4',
     'audio/x-m4a',
     'audio/3gpp',
+    'application/octet-stream',
   ];
 
   if (allowedMimeTypes.includes(file.mimetype)) {

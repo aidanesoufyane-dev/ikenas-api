@@ -61,6 +61,9 @@ const login = asyncHandler(async (req, res) => {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      avatarIndex: user.avatarIndex,
       fullName: user.fullName,
     },
   });
@@ -114,7 +117,17 @@ const getMe = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: user,
+    data: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      avatarIndex: user.avatarIndex,
+      fullName: user.fullName,
+    },
   });
 });
 
@@ -173,10 +186,47 @@ const updateFcmToken = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Token FCM enregistré.' });
 });
 
+/**
+ * @desc    Mettre à jour le profil (phone, avatarIndex)
+ * @route   PUT /api/auth/profile
+ * @access  Private
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const { phone, avatarIndex } = req.body;
+
+  const updates = {};
+  if (phone !== undefined) updates.phone = String(phone).trim();
+  if (avatarIndex !== undefined && avatarIndex !== null) {
+    updates.avatarIndex = Number(avatarIndex);
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { $set: updates },
+    { new: true, runValidators: false }
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      avatarIndex: user.avatarIndex,
+      fullName: user.fullName,
+    },
+  });
+});
+
 module.exports = {
   login,
   register,
   getMe,
   updatePassword,
   updateFcmToken,
+  updateProfile,
 };
